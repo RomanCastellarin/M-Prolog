@@ -19,10 +19,7 @@ parens :: Parser a -> Parser a
 parens = inbetween '(' ')'
 
 charThen :: Char -> a -> Parser a
-charThen c a = char c *> return a 
-
-closePar :: Parser Char
-closePar = char ')' <* blanks
+charThen c a = char c *> return a
 
 validLetter :: Parser Char
 validLetter =  alphaNum <|> char '_'
@@ -64,7 +61,7 @@ arithExpression = (chainl1 arithTerm $ addop <* blanks) <?> "arithmetic expressi
           arithFact = parens arithExpression <|> arithAtom
           arithAtom = (IntConst <$> integer) <|> (IntVar <$> variable) 
           mulop     = (charThen '*' IntTimes) <|> (charThen '/' IntDiv)
-          addop     = (charThen '+' IntPlus) <|>  (charThen '-' IntMinus)
+          addop     = (charThen '+' IntPlus)  <|> (charThen '-' IntMinus)
 
 isExpression :: Parser Predicate
 isExpression = IsExpr <$> variable <* string "is" <* blanks <*> arithExpression <?> "'is' expression"
@@ -77,10 +74,10 @@ predicate :: Parser Predicate
 predicate = try compExpression <|> isExpression <|> barePredicate <?> "predicate" 
 
 bareTerm :: Parser Term
-bareTerm = (V <$> variable) <|> (P <$> try barePredicate) <|> (A <$> atom) <?> "bare term"
+bareTerm = list <|> (V <$> variable) <|> (P <$> try barePredicate) <|> (A <$> atom) <?> "bare term"
 
 term :: Parser Term
-term = (V <$> variable) <|> (P <$> try predicate) <|> (A <$> atom) <?> "term"
+term = list <|> (V <$> variable) <|> (P <$> try predicate) <|> (A <$> atom) <?> "term"
 
 rule ::  Parser Rule
 rule = do hd <- barePredicate 
@@ -88,15 +85,64 @@ rule = do hd <- barePredicate
           return $ Rule empty_id hd tail
          <?> "rule"
 
-renameRules :: [Rule] -> [Rule]
+renameRules :: Program -> Program
 renameRules = map (\(i, Rule _ p t) -> Rule i p t) . zip [0..]
 
-rules :: Parser [Rule]
+rules :: Parser Program
 rules = renameRules <$> many1 rule <?> "program"
 
--- TODO: list, should allow for [x1,x2,...,xn] and [x1,...,xk | Y ]
--- list :: Parser Predicate
--- list = do terms <- char '[' *> blanks *> sepBy1 bareTerm (char ',' <* blanks)
-          
--- ~ list = inbetween '[' ']' (sepBy1 bareTerm (char ',' <* blanks)) >>= return . foldr cons (A $ Atom "nil") <?> "list"
-    -- ~ where cons a b = P $ Predicate True "cons" [a, b]
+list :: Parser Term
+list = do terms <- char '[' *> blanks *> sepBy bareTerm (char ',' <* blanks)
+          ending <- tailNil <|> char '|' <* blanks *> bareTerm <* char ']' <* blanks
+          return $ foldr consList ending terms
+        <?> "list"
+    where tailNil = A <$> charThen ']' (Atom nil) <* blanks
+          consList t1 t2 = P $ Predicate True cons [t1, t2]
+
+{--
+[X, [p(X,Y), 4], pepe, 45]
+
+P (Predicate True "cons" [
+    V (Variable 0 "X"),
+    P (Predicate True "cons" [
+        P (Predicate True "cons" [
+            P (Predicate True "p" [
+                V (Variable 0 "X"),
+                V (Variable 0 "Y")
+            ]),
+            P (Predicate True "cons" [
+                A (Atom "4"),
+                A (Atom "nil")
+            ])
+        ]),
+        P (Predicate True "cons" [
+            A (Atom "pepe"),
+            P (Predicate True "cons" [
+                A (Atom "45"),
+                A (Atom "nil")
+            ])
+        ])
+    ])
+])
+Done!
+
+[ 1 | [ 2 | [ 3 , 4 | [] ]]]
+P (Predicate True "cons" [
+    A (Atom "1"),
+    P (Predicate True "cons" [
+        A (Atom "2"),
+        P (Predicate True "cons" [
+            A (Atom "3"),
+            P (Predicate True "cons" [
+                A (Atom "4"),
+                A (Atom "nil")
+            ])
+        ])
+    ])
+])
+
+
+--}
+
+
+

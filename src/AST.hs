@@ -64,3 +64,11 @@ type Solution = (Unifier, Proof)
 -- Substitución neutral
 identity :: Unifier
 identity = []
+
+-- Constructor de lista
+cons :: String
+cons = "cons"
+
+-- Lista vacía
+nil :: String
+nil = "nil"
