@@ -9,26 +9,29 @@ data Proof = Proof RuleID String [Proof]
 -- Reglas
 data Rule = Rule RuleID Predicate [Predicate]
     deriving (Show)
+    
+-- Programa
+type Program = [Rule]
 
 -- Predicado
 data Predicate = Predicate Direct String [Term]     -- TODO: AVOID P(<is/comp_expression>) SOLVED? check for similar situations
                | IsExpr Variable ArithExp
                | CompExpr Ordering Variable Atom
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- Átomo
 data Atom = Atom String
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- Término
 data Term = P Predicate
           | V Variable
           | A Atom
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- Variable
 data Variable = Variable Index String 
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- Subíndice
 type Index = Int
@@ -47,7 +50,17 @@ data IntExp a = IntConst   Integer
               | IntTimes   (IntExp a) (IntExp a)
               | IntDiv     (IntExp a) (IntExp a)
               | IntVar  a
-    deriving (Show, Functor)
+    deriving (Show, Functor, Eq)
 
 -- Expresiones Aritméticas sobre Variables
 type ArithExp = IntExp Variable
+
+-- Substitución: unificador más general 
+type Unifier = [(Variable, Term)]
+
+-- Solución: MGU + demostración
+type Solution = (Unifier, Proof)
+
+-- Substitución neutral
+identity :: Unifier
+identity = []
