@@ -67,7 +67,7 @@ isExpression :: Parser Predicate
 isExpression = IsExpr <$> variable <* string "is" <* blanks <*> arithExpression <?> "'is' expression"
 
 compExpression :: Parser Predicate
-compExpression = flip CompExpr <$> variable <*> comparator <* blanks <*> atom <?> "comparison expression"
+compExpression = flip CompExpr <$> variable <*> comparator <* blanks <*> arithExpression <?> "comparison expression"
     where comparator = (charThen '<' LT) <|> (charThen '>' GT) <|> (charThen '=' GT)
         
 predicate :: Parser Predicate

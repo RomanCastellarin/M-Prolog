@@ -2,6 +2,10 @@
 
 module AST where
 
+import Control.Applicative
+import Control.Monad        (liftM, ap)
+
+
 -- Árbol de Prueba
 data Proof = Proof RuleID String [Proof]
     deriving Show
@@ -16,7 +20,7 @@ type Program = [Rule]
 -- Predicado
 data Predicate = Predicate Direct String [Term]     -- TODO: AVOID P(<is/comp_expression>) SOLVED? check for similar situations
                | IsExpr Variable ArithExp
-               | CompExpr Ordering Variable Atom
+               | CompExpr Ordering Variable ArithExp
     deriving (Show, Eq)
 
 -- Átomo
@@ -72,3 +76,18 @@ cons = "cons"
 -- Lista vacía
 nil :: String
 nil = "nil"
+
+-- INSTANCIAS 
+
+instance Applicative IntExp where
+  pure  = return
+  (<*>) = ap
+
+instance Monad IntExp where
+    return = IntVar
+    t >>= f = case t of
+        IntPlus x y  -> IntPlus  (x>>=f) (y>>=f)
+        IntMinus x y -> IntMinus (x>>=f) (y>>=f)
+        IntTimes x y -> IntTimes (x>>=f) (y>>=f)
+        IntDiv x y   -> IntDiv   (x>>=f) (y>>=f)
+        IntVar x     -> f x
