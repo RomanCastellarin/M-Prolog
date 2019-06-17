@@ -43,9 +43,9 @@ evalArith a = case a of
 
 
 comp :: Unifier -> Unifier -> Unifier
-comp u1 u2 = [(v, t2) | (v, t) <- u1, let t2 = substitute u2 t, (V v) /= t2] ++ [(v,t) | (v,t) <- u2, lookup v u1 == Nothing]
+comp u2 u1 = [(v, t2) | (v, t) <- u1, let t2 = substitute u2 t, (V v) /= t2] ++ [(v,t) | (v,t) <- u2, lookup v u1 == Nothing]
 
---{x/a, y/f(z), z/y} y τ={u/a, x/b, y/z, z/g(x)}
+--{x/a, y/f(z), z/y}yτ={u/a, x/b, y/z, z/g(x)}
 sigma1 = [(Variable 0 "X", A (Atom "a")),
           (Variable 0 "Y", P (Predicate True "f" [V (Variable 0 "Z")])),
           (Variable 0 "Z", V (Variable 0 "Y"))]
@@ -74,6 +74,6 @@ unify t1 t2 = case (t1, t2) of
     (t, V v)     | not (v `isIn` t)      -> return [(v, t)]
     (_, _)                               -> Nothing
   where checkPredicates (Predicate n1 x1 l1) (Predicate n2 x2 l2) = n1 == n2 && x1 == x2 && length l1 == length l2
-        unifyPair u (p1, p2) = unify (substitute u p1) (substitute u p2)
+        unifyPair u (p1, p2) = comp u <$> unify (substitute u p1) (substitute u p2)
         getTerms (Predicate _ _ l) = l
 
