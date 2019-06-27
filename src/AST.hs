@@ -77,6 +77,10 @@ cons = "cons"
 nil :: String
 nil = "nil"
 
+-- Regla Aritmética
+aritRule :: RuleID
+aritRule = -2
+
 -- INSTANCIAS 
 
 instance Applicative IntExp where
