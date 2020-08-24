@@ -1,10 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Sandbox where
+module Source.Sandbox where
 
-import AST
-import Parser
+import Source.AST
+import Source.Parser
 import Text.ParserCombinators.Parsec    (parse)
 import Interpreter
 import Data.Maybe                       (fromMaybe, maybeToList, mapMaybe, fromJust)

@@ -1,6 +1,6 @@
-module Interpreter where
+module Source.Interpreter where
 
-import AST
+import Source.AST
 import Data.Maybe                       (fromMaybe, maybeToList, mapMaybe, fromJust)
 import Control.Applicative              (liftA2)
 import Control.Monad                    (foldM, MonadPlus, mzero)

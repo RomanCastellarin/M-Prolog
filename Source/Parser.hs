@@ -1,10 +1,10 @@
-module Parser where
+module Source.Parser where
 
 import Control.Applicative              (liftA2)
 import Text.ParserCombinators.Parsec
 import Data.Functor                     (void)
 
-import AST
+import Source.AST
 
 empty_id :: RuleID
 empty_id = -1

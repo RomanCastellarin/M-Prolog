@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module AST where
+module Source.AST where
 
 import Control.Applicative
 import Control.Monad            (ap)

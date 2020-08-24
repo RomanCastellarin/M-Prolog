@@ -1,11 +1,11 @@
 
 module Main where
 
-import AST
-import Parser
+import Source.AST
+import Source.Parser
 import Text.ParserCombinators.Parsec    (parse)
-import Interpreter
-import Sandbox
+import Source.Interpreter
+--import Source.Sandbox
 
 import Data.List                        (intercalate)
 import System.Directory                 (doesFileExist)
