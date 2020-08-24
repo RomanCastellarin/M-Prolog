@@ -7,8 +7,7 @@ import Text.ParserCombinators.Parsec    (parse)
 import Interpreter
 import Sandbox
 
-import Control.Arrow (first)
-import           Data.List              (intercalate)
+import Data.List                        (intercalate)
 import System.Directory                 (doesFileExist)
 import Control.Monad                    (when)
 import Data.Maybe                       (fromMaybe)
@@ -20,7 +19,7 @@ main :: IO ()
 main = prompt Nothing
 
 prompt :: Maybe Program  -> IO()
-prompt program = putStr "?-" >> getLine >>= processCommand
+prompt program = putStr "?- " >> getLine >>= processCommand
     where processCommand cmd = case cmd of
             "quit!"    -> return ()
             "show!"    -> (putStr . unlines)  (showRule <$> fromMaybe [] program) >> prompt program
@@ -78,9 +77,8 @@ showProof i p = case p of
     where space n = [1..n] >>= const "  "
 
 showResults :: [Solution] -> [String]
-showResults sols = if null sols then ["No"] else showSolution . prepareSol <$> sols
-    where prepareSol = id
-          showSolution (σ, p) = "Solution:\n\t" ++ showUnifier σ ++ "\nProof:\n" ++ showProof 1 p
+showResults sols = if null sols then ["No"] else showSolution <$> sols
+    where showSolution (σ, p) = "Solution:\n\t" ++ showUnifier σ ++ "\nProof:\n" ++ showProof 1 p
           showUnifier σ = if null σ then "Yes" else intercalate " " $ showAssignment <$> filter (\(Variable i _, _) -> i == 0) σ
           showAssignment (Variable _ v, t) = v ++ " = " ++ showTerm t 
 

@@ -1,10 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
--- {-# LANGUAGE TypeSynonymInstances #-}
 
 module AST where
 
 import Control.Applicative
-import Control.Monad            (liftM, ap)
+import Control.Monad            (ap)
 import Data.Functor.Identity
 
 -- Árbol de Prueba
@@ -47,9 +46,8 @@ type RuleID = Int
 -- ¿Cómputo directo del predicado o de su opuesto?
 type Direct = Bool
 
--- Expresiones Aritméticas  -- TODO: should I abstract away the operation? (benefit: pattern matching)
+-- Expresiones Aritméticas
 data IntExp a = IntConst   Integer
-             -- | IntNeg     (IntExp a)             -- too complicated
               | IntPlus    (IntExp a) (IntExp a)
               | IntMinus   (IntExp a) (IntExp a)
               | IntTimes   (IntExp a) (IntExp a)
@@ -65,6 +63,8 @@ type Unifier = [(Variable, Term)]
 
 -- Solución: MGU + demostración
 type Solution = (Unifier, Proof)
+
+-- CONSTANTES
 
 -- Substitución neutral
 identity :: Unifier

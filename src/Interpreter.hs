@@ -2,14 +2,10 @@ module Interpreter where
 
 import AST
 import Data.Maybe                       (fromMaybe, maybeToList, mapMaybe, fromJust)
-import Control.Applicative              (liftA2, pure)
-import Control.Monad                    (foldM, join, MonadPlus, mzero)
-import Control.Monad.Extra              (concatMapM, concatForM)
+import Control.Applicative              (liftA2)
+import Control.Monad                    (foldM, MonadPlus, mzero)
 import Text.Read                        (readMaybe)
-import           Data.List              (intercalate)
---import Control.Monad.Trans.Maybe        --(MaybeT)
-
-import           Debug.Trace         (trace)
+import Data.List                        (intercalate)
 
 
 -- ====================================================
@@ -160,17 +156,17 @@ evalArith a = case a of
 
 
 resolve :: Predicate -> Program -> [Solution]
-resolve goal rules = mapMaybe match (renameRule <$> rules) >>= exec
-    where match :: Rule -> Maybe (Rule, Solution)
-          match rule@(Rule i lhs _) =  (,) rule <$> (generateSolution i goal <$> unifyPredicates goal lhs)
+resolve goal rules = mapMaybe matchRule (renameRule <$> rules) >>= backtrack
+    where 
+          matchRule rule@(Rule i lhs _) =  (,) rule <$> (generateSolution i goal <$> unifyPredicates goal lhs)
 
-          exec (Rule i lhs clauses, sol@(σ, proof)) = refreshSolution lhs <$> foldM combine sol clauses --[(σ, proof)]
+          backtrack (Rule i lhs clauses, sol@(σ, proof)) = refreshSolution lhs <$> foldM combine sol clauses --[(σ, proof)]
 
-          combine (σ, proof) p = case p of
-            IsExpr x e -> composeSolutions (σ, proof) <$> (e >>=? maybeToList . replaceArith σ >>= evalArith >>= isExprSolution σ x)
-            CompExpr c x e -> composeSolutions (σ, proof) <$> maybeToList (e >>=? replaceArith σ >>= evalArith >>= compExprSolution σ x c)
-            Predicate True _ _ -> composeSolutions (σ, proof) <$> predSolution σ p (renameRule <$> rules)
-            Predicate False _ _ -> composeSolutions (σ, proof) <$> if null $ predSolution σ p (renameRule <$> rules) then [(σ, proof)] else []
+          combine (σ, proof) p = composeSolutions (σ, proof) <$> case p of
+            IsExpr x e ->  e >>=? maybeToList . replaceArith σ >>= evalArith >>= isExprSolution σ x
+            CompExpr c x e -> maybeToList (e >>=? replaceArith σ >>= evalArith >>= compExprSolution σ x c)
+            Predicate True _ _ ->  predSolution σ p (renameRule <$> rules)
+            Predicate False _ _ ->  if null $ predSolution σ p (renameRule <$> rules) then [(σ, proof)] else []
 
           isExprSolution σ x n = case lookup x σ of
                                     Just t  -> if t == t' then return (identity, Proof aritRule (isExprProof x n) []) else mzero
