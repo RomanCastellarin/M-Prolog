@@ -1,25 +1,52 @@
-X < 45 + (X + 3 * ( 777 - 5) /2) * -44 + Ya
-45 + -(2 + 3 * ( 777 - 5) /2) * -44 +9
-[ 1 | [ 2 | [ 3 , 4 | [] ]]]
-% TESTING FILE FOR THE  M-PROLOG PROGRAMMING LANGUAGE   
-    
-    % rev(cons(1,cons(2,cons(3,cons(4,cons(5,nil))))), What).
-
-% rev(cons(1,cons(2,nil)), What
-     % pb(5, nil, What)
-
-pb(X, nil, cons(X, nil)).
-pb(X, cons(Y,YS), cons(Y, ZS)) :- pb(X, YS, ZS).
-
-rev(nil, nil).
-rev(cons(X,XS), ZS) :- rev(XS, YS), pb(X, YS, ZS).
-
 fact(0, 1).
-fact(X, Y) :- X > -1, V is X-1, fact(V, W), Y is V*(A-45*( W -8)) / (45 + W).   
+fact(X, Y) :- V is X-1, X > 0, fact(V, W), Y is W*X.
 
-%negar(X) :- rev(X,X), !, pb(X,X,X).
+% push back
+pb(X, [], cons(X, nil)).
+pb(X, [Y|YS], [Y|ZS]) :- pb(X, YS, ZS).
 
-% revappend([], Ys, Ys).
-% revappend([X|Xs], Ys, Zs) :- revappend(Xs, [X|Ys], Zs).
-% reverse(Xs,Ys) :- revappend(Xs,[],Ys).
+% list reverse
+rev([], []).
+rev([X|XS], ZS) :- rev(XS, YS), pb(X, YS, ZS).
+
+% test comparison
+twice(X, Y) :- Y is 2*X, Y = 300/10. 
+
+% test negation as failure
+
+friends(rom, seba).
+friends(seba, lucas).
+friends(seba, ana).
+friends(ana, ori).
+enemies(X, Y) :- ~friends(X, Y).
+friends(X, Y) :- friends(X, Z), friends(Z, Y). 
+
+%% more test
+child(john,sue).     child(john,sam).   
+child(jane,sue).     child(jane,sam).   
+child(sue,george).   child(sue,gina). 
+
+male(john).   male(sam).     male(george). 
+female(sue).  female(jane).  female(june). 
+
+parent(Y,X) :- child(X,Y).
+father(Y,X) :- child(X,Y), male(Y).
+opp_sex(X,Y) :- male(X), female(Y). 
+opp_sex(Y,X) :- male(X), female(Y). 
+grand_father(X,Z) :- father(X,Y), parent(Y,Z).
+
+% GRAPHS
+
+search(X, X, T, T).
+search(X, Y, T, R) :- edge(X, Z), ~member(Z, T), search(Z, Y, [Z|T], R).
+search(X, Y, T, R) :- edge(Z, X), ~member(Z, T), search(Z, Y, [Z|T], R).
+
+member(X, [X|_]).
+member(X, [_|Y]) :- member(X, Y).
+
+edge(g,h).    edge(g,d).     edge(e,d).      edge(h,f).     edge(e,f).
+edge(a,e).    edge(a,b).     edge(b,f).      edge(b,c).     edge(f,c).
+
+% CUT OPERATOR
+
 

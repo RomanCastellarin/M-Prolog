@@ -1,62 +1,66 @@
 module Interpreter where
 
 import AST
-import Data.Maybe           (fromMaybe, maybeToList)
-import Control.Monad        (foldM)
-import Text.Read            (readMaybe)
+import Data.Maybe                       (fromMaybe, maybeToList, mapMaybe, fromJust)
+import Control.Applicative              (liftA2, pure)
+import Control.Monad                    (foldM, join, MonadPlus, mzero)
+import Control.Monad.Extra              (concatMapM, concatForM)
+import Text.Read                        (readMaybe)
+import           Data.List              (intercalate)
+--import Control.Monad.Trans.Maybe        --(MaybeT)
+
+import           Debug.Trace         (trace)
 
 
-extractInt :: Term -> Maybe Integer
-extractInt t = case t of
-    A (Atom s) -> readMaybe s
-    _          -> Nothing
+-- ====================================================
+--              CANDIDATE FOR PRODUCTION
+-- ====================================================
+
+-- renombra una regla para que todas las variables aparezcan nuevas
+renameRule :: Rule -> Rule
+renameRule r = case r of
+    Rule i p xs -> Rule i (renamePred p) $ renamePred <$> xs
+    where   renamePred p = case p of
+                Predicate n x l -> Predicate n x $ renameTerm <$> l
+                IsExpr x e      -> IsExpr (advance x) $ advance <$> e
+                CompExpr c x e  -> CompExpr c (advance x) $ advance <$> e
+            renameTerm t = case t of
+                P p -> P $ renamePred p
+                V v -> V (advance v)
+                t -> t
+            advance (Variable n s) = Variable (n+1) s
+
+-- compone dos substituciones
+-- t (compose s1 s2) = t (s1∘s2) = (t s1) s2
+compose :: Unifier -> Unifier -> Unifier
+compose σ1 σ2 = σ1' ++ σ2'
+    where σ1' = [(v, t2) | (v, t) <- σ1, let t2 = fromJust $ substTerm σ2 t, V v /= t2]
+          σ2' = [(v, t)  | (v, t) <- σ2, lookup v σ1 == Nothing]
 
 -- SUBSTITUCIONES 
 
--- (uso con bind) construye una expr. aritmética equivalente al término asociado a la variable
--- TODO: this function should be able to fail (hence substitutions could fail)  
-replaceArith :: Unifier -> Variable -> ArithExp
-replaceArith u v = maybe (IntVar v) convert $ lookup v u
-    where convert (A (Atom n)) = (IntConst $ read n)    -- TODO: this could also fail?
-          convert (V w)        = IntVar w
-          convert _            = IntVar v -- TODO: how to catch this error?
+-- construye una expr. aritmética equivalente al término asociado a la variable 
+replaceArith :: Unifier -> Variable -> Maybe ArithExp
+replaceArith σ v = maybe (Just $ return v) convert $ lookup v σ
+    where convert (A (Atom n)) = IntConst <$> readMaybe n
+          convert (V w)        = Just (IntVar w)
+          convert _            = Nothing
+
+-- aplica un unificador al término
+substTerm :: Unifier -> Term -> Maybe Term
+substTerm σ t = case t of
+        P p -> P <$> substPredicate σ p
+        V v -> Just $ fromMaybe (V v) $ lookup v σ
+        t   -> Just t
 
 -- aplica un unificador a un predicado
-substPredicate :: Unifier -> Predicate -> Predicate
-substPredicate u p = case p of
-    Predicate n x l -> Predicate n x $ map (substitute u) l
-    IsExpr x e      -> IsExpr x $ e >>= replaceArith u
-    CompExpr c x e  -> CompExpr c x $ e >>= replaceArith u
+substPredicate :: Unifier -> Predicate -> Maybe Predicate
+substPredicate σ p = case p of
+    Predicate d p l -> Predicate d p <$> mapM (substTerm σ) l
+    IsExpr v e      -> IsExpr v <$> (e >>=? replaceArith σ)
+    CompExpr c v e  -> CompExpr c v <$> (e >>=? replaceArith σ)
 
--- aplica el unificador al término
-substitute :: Unifier -> Term -> Term
-substitute u t = case t of
-        P p -> P $ substPredicate u p
-        V v -> fromMaybe (V v) (lookup v u)
-        t   -> t
-
--- EVALUACIONES
-
--- evalúa una expresión aritmética, falla si no está totalmente determinada
--- NOTE: There's a natural transformation Maybe -> List, so I use list which simplifies further work
-evalArith :: ArithExp -> [Integer]
-evalArith a = case a of
-    IntConst x   -> [x]
-    IntPlus  x y -> (+) <$> evalArith x <*> evalArith y
-    IntTimes x y -> (*) <$> evalArith x <*> evalArith y
-    IntMinus x y -> (-) <$> evalArith x <*> evalArith y
-    IntDiv   x y -> do a <- evalArith x
-                       b <- evalArith y
-                       if b /= 0 then [a `div` b] else []
-    -- IntVar (Variable _ n) -> [] -- NOTE: should never occur as variables should have been substituted
-    _ -> []
-
--- COMPOSICIONES
-
--- composes two unifications
-comp :: Unifier -> Unifier -> Unifier
-comp u2 u1 = [(v, t2) | (v, t) <- u1, let t2 = substitute u2 t, (V v) /= t2] ++ [(v,t) | (v,t) <- u2, lookup v u1 == Nothing]
-
+-- UNIFICATION
 
 -- chequea si la variable aparece libre en el término
 isIn :: Variable -> Term -> Bool
@@ -64,46 +68,127 @@ isIn v t = case t of
         P (Predicate _ _ p) -> (v `isIn`) `any` p
         t                   -> V v == t
 
--- UNIFICACIONES
 
--- retorna (si hubiere) una unificación entre dos términos
-unify :: Term -> Term -> Maybe Unifier
-unify t1 t2 = case (t1, t2) of
-    (t1, t2)     | t1 == t2              -> return identity
-    (P p1, P p2) | checkPredicates p1 p2 -> foldM unifyPair identity $ zip (getTerms p1) (getTerms p2)
+-- unifica predicados
+unifyPredicates :: Predicate -> Predicate -> Maybe Unifier
+unifyPredicates p1 p2 = case (p1, p2) of
+    (Predicate _ n1 t1, Predicate _ n2 t2) | n1 == n2 && length t1 == length t2 -> foldM unifyPair identity $ zip t1 t2
+                                           | otherwise                          -> Nothing
+    where unifyPair σ (t1, t2) = do t1' <- substTerm σ t1
+                                    t2' <- substTerm σ t2
+                                    compose σ <$> unifyTerms t1' t2'
+
+-- unifica terminos
+unifyTerms :: Term -> Term -> Maybe Unifier
+unifyTerms t1 t2 = case (t1, t2) of
+    (P p1, P p2)                         -> unifyPredicates p1 p2
     (V v, t)     | not (v `isIn` t)      -> return [(v, t)]
     (t, V v)     | not (v `isIn` t)      -> return [(v, t)]
-    _                                    -> Nothing
-  where checkPredicates (Predicate n1 x1 l1) (Predicate n2 x2 l2) = n1 == n2 && x1 == x2 && length l1 == length l2
-        unifyPair u (p1, p2) = comp u <$> unify (substitute u p1) (substitute u p2)
-        getTerms (Predicate _ _ l) = l
+    (t1, t2)     | t1 == t2              -> return identity
+                 | otherwise             -> Nothing
+
+-- muestra la cola de una lista
+showListTail :: Term -> String
+showListTail t = case t of
+    A (Atom "nil")                  -> "]"
+    P (Predicate _ "cons" [p, q])   -> ", " ++ showTerm p ++ showListTail q
+    t                               -> " | " ++ showTerm t ++ "]" 
+
+-- muestra un termino
+showTerm :: Term -> String
+showTerm t = case t of
+    A a -> case a of Atom x | x ==  "nil" -> "[]" | otherwise -> x
+    V v -> showVariable v
+    P p -> showPredicate p
+
+-- muestra una variable
+showVariable :: Variable -> String
+showVariable v = case v of
+    Variable i v -> v -- ++ "_" ++ show i
+
+-- muestra una expresion aritmetica
+showArith :: ArithExp -> String
+showArith e = case e of
+    IntPlus x y  -> "(" ++ (showArith x) ++ "+" ++ (showArith y) ++ ")"
+    IntMinus x y -> "(" ++ (showArith x) ++ "-" ++ (showArith y) ++ ")"
+    IntTimes x y -> "(" ++ (showArith x) ++ "*" ++ (showArith y) ++ ")"
+    IntDiv x y   -> "(" ++ (showArith x) ++ "/" ++ (showArith y) ++ ")"
+    IntVar x     -> showVariable x
+    IntConst x   -> show x
+
+-- muestra una relacion de orden
+showOrdering :: Ordering -> String
+showOrdering o = case o of
+    LT -> "<"
+    GT -> ">"
+    EQ -> "="
+
+-- muestra un predicado
+showPredicate :: Predicate -> String
+showPredicate p = case p of
+    Predicate _ "cons" [p, q]   -> "[" ++ showTerm p ++ showListTail q
+    Predicate d name terms      -> (if d then "" else "~") ++ name ++ "(" ++ intercalate ", " (showTerm <$> terms) ++ ")"
+    IsExpr v e                  -> showVariable v ++ " is " ++ showArith e
+    CompExpr o v e              -> showVariable v ++ " " ++ showOrdering o ++ " " ++ showArith e
+
+-- genera una solucion nueva para un predicado
+-- (puede ser reemplazada en un futuro si la derivacion es exitosa)
+generateSolution :: RuleID -> Predicate -> Unifier -> Solution
+generateSolution i goal σ = (σ, Proof i ("can't derive " ++ (showPredicate . fromJust . substPredicate σ)  goal) [])
+
+-- reescribe una derivacion exitosa
+refreshSolution :: Predicate -> Solution -> Solution
+refreshSolution p (σ, Proof i _ tree) = (σ, Proof i (writeProof p σ) tree)
+    where writeProof p σ = showPredicate . fromJust $ substPredicate σ p
+
+-- compone soluciones
+composeSolutions :: Solution -> Solution -> Solution
+composeSolutions (σ₁, Proof i s xs) (σ₂, p) = (compose σ₁ σ₂, Proof i s (xs ++ [p]))
+
+-- evalua una expresion aritmetica y devuelve su resultado como valor monadico, o falla
+evalArith :: (MonadPlus m) => ArithExp -> m Integer
+evalArith a = case a of
+    IntConst x   -> return x
+    IntPlus  x y -> liftA2 (+) (evalArith x) (evalArith y)
+    IntTimes x y -> liftA2 (*) (evalArith x) (evalArith y)
+    IntMinus x y -> liftA2 (-) (evalArith x) (evalArith y)
+    IntDiv   x y -> do a <- evalArith x
+                       b <- evalArith y
+                       if b /= 0 then return (a `div` b) else mzero
+    _ -> mzero -- (IntVar) NOTE: should never occur for a proper program as variables should have been substituted
 
 
--- compone dos soluciones
-buildSol :: Solution -> Solution -> Solution
-buildSol (u1, Proof n s xs) (u2, p) = (comp u1 u2, Proof n s (p:xs))
 
+resolve :: Predicate -> Program -> [Solution]
+resolve goal rules = mapMaybe match (renameRule <$> rules) >>= exec
+    where match :: Rule -> Maybe (Rule, Solution)
+          match rule@(Rule i lhs _) =  (,) rule <$> (generateSolution i goal <$> unifyPredicates goal lhs)
 
-evalIsExpr :: Variable -> ArithExp -> [Solution]
-evalIsExpr v e =  flip (,) (Proof aritRule "<IsExpression>" []) . return <$> (,) v <$> A . Atom . show <$> evalArith e
+          exec (Rule i lhs clauses, sol@(σ, proof)) = refreshSolution lhs <$> foldM combine sol clauses --[(σ, proof)]
 
-evalCompExpr :: Ordering -> Maybe Term -> ArithExp -> Bool
-evalCompExpr ord v e = checkOrder (maybeToList $ v >>= extractInt) (evalArith e)  
-    where checkOrder x y = or [ord == (compare n1 n2) | n1 <- x, n2 <- y]
+          combine (σ, proof) p = case p of
+            IsExpr x e -> composeSolutions (σ, proof) <$> (e >>=? maybeToList . replaceArith σ >>= evalArith >>= isExprSolution σ x)
+            CompExpr c x e -> composeSolutions (σ, proof) <$> maybeToList (e >>=? replaceArith σ >>= evalArith >>= compExprSolution σ x c)
+            Predicate True _ _ -> composeSolutions (σ, proof) <$> predSolution σ p (renameRule <$> rules)
+            Predicate False _ _ -> composeSolutions (σ, proof) <$> if null $ predSolution σ p (renameRule <$> rules) then [(σ, proof)] else []
 
-propagate :: Solution -> Predicate -> [Solution]
-propagate (s, p) t = case t of
-    IsExpr v e          -> buildSol (s, p) <$> evalIsExpr v e
-    CompExpr ord v e    -> if evalCompExpr ord (lookup v s) e then return (s, p) else []
-    --t                   -> solve t (freshen program)
+          isExprSolution σ x n = case lookup x σ of
+                                    Just t  -> if t == t' then return (identity, Proof aritRule (isExprProof x n) []) else mzero
+                                    Nothing -> return ([(x, t')], Proof aritRule (isExprProof x n) [])
+                                where t' = A . Atom . show $ n
 
-{--
-solveRule :: Predicate -> Rule -> [Solution]
-solveRule p r = case r of
-    Rule i q xs -> 
+          isExprProof (Variable _ x) n = x ++ " is " ++ show n
 
+          compExprProof (Variable _ x) c n = x ++ " " ++ showOrdering c ++ " " ++ show n
 
-solve :: Predicate -> Program -> [Solution]
-solve goal program = program >>= solveRule goal
---}
+          compExprSolution σ x c n = do t <- lookup x σ
+                                        m <- case t of
+                                            A (Atom m) -> readMaybe m
+                                            _          -> Nothing
+                                        if c == compare m n
+                                        then return (identity, Proof aritRule (compExprProof x c n) [])
+                                        else Nothing
+
+          predSolution σ p rs = do q <- maybeToList (substPredicate σ p)
+                                   resolve q rs
 

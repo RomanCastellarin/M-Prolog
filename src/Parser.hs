@@ -51,7 +51,7 @@ atom = Atom <$> (quotation <|> identifier <|> show <$> integer ) <?> "atom"
 barePredicate :: Parser Predicate
 barePredicate = do direct <- (charThen '~' False) <|> return True
                    name <- identifier
-                   xs <- parens $ sepBy1 term (char ',' <* blanks)
+                   xs <- parens $ sepBy1 bareTerm (char ',' <* blanks)
                    return $ Predicate direct name xs
                 <?> "bare predicate"
 
@@ -68,7 +68,7 @@ isExpression = IsExpr <$> variable <* string "is" <* blanks <*> arithExpression 
 
 compExpression :: Parser Predicate
 compExpression = flip CompExpr <$> variable <*> comparator <* blanks <*> arithExpression <?> "comparison expression"
-    where comparator = (charThen '<' LT) <|> (charThen '>' GT) <|> (charThen '=' GT)
+    where comparator = (charThen '<' LT) <|> (charThen '>' GT) <|> (charThen '=' EQ)
         
 predicate :: Parser Predicate
 predicate = try compExpression <|> isExpression <|> barePredicate <?> "predicate" 
@@ -80,13 +80,13 @@ term :: Parser Term
 term = list <|> (V <$> variable) <|> (P <$> try predicate) <|> (A <$> atom) <?> "term"
 
 rule ::  Parser Rule
-rule = do hd <- barePredicate 
+rule = do hd <- blanks *> barePredicate 
           tail <- (string ":-" *> blanks *> sepBy predicate (char ',' <* blanks) <|> return []) <* char '.' <* blanks
           return $ Rule empty_id hd tail
          <?> "rule"
 
 renameRules :: Program -> Program
-renameRules = map (\(i, Rule _ p t) -> Rule i p t) . zip [0..]
+renameRules = map (\(i, Rule _ p t) -> Rule i p t) . zip [1..]
 
 rules :: Parser Program
 rules = renameRules <$> many1 rule <?> "program"
@@ -98,51 +98,4 @@ list = do terms <- char '[' *> blanks *> sepBy bareTerm (char ',' <* blanks)
         <?> "list"
     where tailNil = A <$> charThen ']' (Atom nil) <* blanks
           consList t1 t2 = P $ Predicate True cons [t1, t2]
-
-{--
-[X, [p(X,Y), 4], pepe, 45]
-
-P (Predicate True "cons" [
-    V (Variable 0 "X"),
-    P (Predicate True "cons" [
-        P (Predicate True "cons" [
-            P (Predicate True "p" [
-                V (Variable 0 "X"),
-                V (Variable 0 "Y")
-            ]),
-            P (Predicate True "cons" [
-                A (Atom "4"),
-                A (Atom "nil")
-            ])
-        ]),
-        P (Predicate True "cons" [
-            A (Atom "pepe"),
-            P (Predicate True "cons" [
-                A (Atom "45"),
-                A (Atom "nil")
-            ])
-        ])
-    ])
-])
-Done!
-
-[ 1 | [ 2 | [ 3 , 4 | [] ]]]
-P (Predicate True "cons" [
-    A (Atom "1"),
-    P (Predicate True "cons" [
-        A (Atom "2"),
-        P (Predicate True "cons" [
-            A (Atom "3"),
-            P (Predicate True "cons" [
-                A (Atom "4"),
-                A (Atom "nil")
-            ])
-        ])
-    ])
-])
-
-
---}
-
-
 

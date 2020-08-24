@@ -1,0 +1,65 @@
+Subsitutions could Fail:
+
+let f be a unifier such that f = [Y / X] where X is a variable and Y is:
+ - a non integer constant (e.g., 'Dog'), and
+ - a non-variable
+then <arithmetic expression> / f is not an arithmetic expression (as X would be replaced by a general term). We should model subtitution fail.
+
+
+Substitution algorithm source:
+http://www.mathcs.duq.edu/simon/Fall04/notes-7-4/node4.html
+
+Example family:
+https://cse.sc.edu/~ahein/330/example.html
+
+Compositions can't fail.
+Proof (to be checked):
+    - substitution can fail only in Arithmetic Expressions (AE)
+    - an AE can't show up on the RHS of a MGU (check)
+
+TODO LIST
+Add unittesting
+DONE *** Add list slicing 
+Multiquery 
+DONE *** Should a failed program load wipe memory or continue last program? 
+
+
+Arithmetic Expressions (AE):
+    Any substituion involving AE is only: one variable to another variable, one variable to Integer 
+
+
+SOLVED ** CONJECTURE
+    AE or IE dont show up in unifications
+    proof. (see BUG 1)
+
+CONJECTURE
+    When GenProof, the substiution leaves no free variables
+
+BUG 1: (ATTEMPTED - Line 54: term --> bareTerm)
+    When parsing terms within a predicate, eg, P( t1, t2, ..., tn ) only barePredicates should be allowed,
+    but in Rules, general terms should. That is, P :- t1, t2, ..., tn
+
+BUG 2: (ATTEMPTED - Line 56: lookup v u --> Just $ fromMaybe (V v) $ lookup v u)
+    Applying a substitution S to a term with a variable not in the domain of S, yielded Nothing (now it doesnt)
+
+BUG 3: (ATTEMPED - isExprSolution --> added environment to check)
+    (Decided) During the resolution of an IE "X is E", X must either
+         1. not belong to the domain of subtitution
+         2. belong and map to a an atom whose value is exactly of the integer yielded by E
+    failure to comply will yield error (non-satisfaction)
+
+BUG 4: (SOLVED) (IS related to above)
+    fact(1, 100) yields true because Y is already bound to value
+    THEREFORE: ISEXPR CAN FAIL EVEN WHEN ARITHEXP DONT
+
+CHECKED *** MAYBE BUG 5:
+    friend/enemy hadnt at first seemed to work properly, checked
+
+DEMO:
+    Show that for t = [1, 2, 3 | X0] and s = [t / X0], ts yields [1, 2, 3, 1, 2, 3 | X0]
+
+TODO:
+    Name number of solutions beforehand
+    DISCARDED: that would force to evaluate the solution space, which is not what I want!! I like lazy
+
+  

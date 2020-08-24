@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveFunctor #-}
+-- {-# LANGUAGE TypeSynonymInstances #-}
 
 module AST where
 
 import Control.Applicative
-import Control.Monad        (liftM, ap)
-
+import Control.Monad            (liftM, ap)
+import Data.Functor.Identity
 
 -- Árbol de Prueba
 data Proof = Proof RuleID String [Proof]
@@ -18,7 +19,7 @@ data Rule = Rule RuleID Predicate [Predicate]
 type Program = [Rule]
 
 -- Predicado
-data Predicate = Predicate Direct String [Term]     -- TODO: AVOID P(<is/comp_expression>) SOLVED? check for similar situations
+data Predicate = Predicate Direct String [Term]     -- TODO: AVOID P(<is/comp_expression>) SOLVED? (sol: bare predicate) check for similar situations
                | IsExpr Variable ArithExp
                | CompExpr Ordering Variable ArithExp
     deriving (Show, Eq)
@@ -48,12 +49,12 @@ type Direct = Bool
 
 -- Expresiones Aritméticas  -- TODO: should I abstract away the operation? (benefit: pattern matching)
 data IntExp a = IntConst   Integer
-             -- | IntNeg     (IntExp a)
+             -- | IntNeg     (IntExp a)             -- too complicated
               | IntPlus    (IntExp a) (IntExp a)
               | IntMinus   (IntExp a) (IntExp a)
               | IntTimes   (IntExp a) (IntExp a)
               | IntDiv     (IntExp a) (IntExp a)
-              | IntVar  a
+              | IntVar     a
     deriving (Show, Functor, Eq)
 
 -- Expresiones Aritméticas sobre Variables
@@ -89,9 +90,13 @@ instance Applicative IntExp where
 
 instance Monad IntExp where
     return = IntVar
-    t >>= f = case t of
-        IntPlus x y  -> IntPlus  (x>>=f) (y>>=f)
-        IntMinus x y -> IntMinus (x>>=f) (y>>=f)
-        IntTimes x y -> IntTimes (x>>=f) (y>>=f)
-        IntDiv x y   -> IntDiv   (x>>=f) (y>>=f)
-        IntVar x     -> f x
+    t >>= f = runIdentity (t >>=? Identity . f)
+
+infixl 1 >>=?
+t >>=? f = case t of
+    IntPlus x y  -> liftA2 IntPlus  (x>>=?f) (y>>=?f)
+    IntMinus x y -> liftA2 IntMinus (x>>=?f) (y>>=?f)
+    IntTimes x y -> liftA2 IntTimes (x>>=?f) (y>>=?f)
+    IntDiv x y   -> liftA2 IntDiv   (x>>=?f) (y>>=?f)
+    IntVar x     -> f x
+    IntConst x   -> pure (IntConst x)
