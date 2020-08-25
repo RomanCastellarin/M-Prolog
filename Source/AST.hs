@@ -2,8 +2,15 @@
 
 module Source.AST where
 
+{-
+    ============================================
+            Abstract syntax for M-Prolog    
+    ============================================
+-}
+
+-- BASE LIBRARIES                       imports
 import Control.Applicative
-import Control.Monad            (ap)
+import Control.Monad                    (ap)
 import Data.Functor.Identity
 
 -- Árbol de Prueba
@@ -18,7 +25,7 @@ data Rule = Rule RuleID Predicate [Predicate]
 type Program = [Rule]
 
 -- Predicado
-data Predicate = Predicate Direct String [Term]     -- TODO: AVOID P(<is/comp_expression>) SOLVED? (sol: bare predicate) check for similar situations
+data Predicate = Predicate Direct String [Term]
                | IsExpr Variable ArithExp
                | CompExpr Ordering Variable ArithExp
     deriving (Show, Eq)
@@ -61,7 +68,7 @@ type ArithExp = IntExp Variable
 -- Substitución: unificador más general 
 type Unifier = [(Variable, Term)]
 
--- Solución: MGU + demostración
+-- Solución: unificador + demostración
 type Solution = (Unifier, Proof)
 
 -- CONSTANTES
@@ -81,6 +88,10 @@ nil = "nil"
 -- Regla Aritmética
 aritRule :: RuleID
 aritRule = -2
+
+-- Regla libre (fuera de todo programa)
+empty_id :: RuleID
+empty_id = -1
 
 -- INSTANCIAS 
 

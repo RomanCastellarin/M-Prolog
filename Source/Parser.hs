@@ -1,13 +1,21 @@
 module Source.Parser where
 
-import Control.Applicative              (liftA2)
-import Text.ParserCombinators.Parsec
-import Data.Functor                     (void)
+{-
+    ============================================
+        Parsers for datatypes defined in AST    
+    ============================================
+-}
 
+-- MODULES
 import Source.AST
 
-empty_id :: RuleID
-empty_id = -1
+-- BASE LIBRARIES                       imports
+import Control.Applicative              (liftA2)
+import Data.Functor                     (void)
+
+-- 3rd PARTY LIBRARIES
+import Text.ParserCombinators.Parsec
+
 
 nonNewline :: Parser Char
 nonNewline = noneOf "\n"
@@ -88,8 +96,8 @@ rule = do hd <- blanks *> barePredicate
 renameRules :: Program -> Program
 renameRules = map (\(i, Rule _ p t) -> Rule i p t) . zip [1..]
 
-rules :: Parser Program
-rules = renameRules <$> many1 rule <?> "program"
+program :: Parser Program
+program = renameRules <$> many1 rule <?> "program"
 
 list :: Parser Term
 list = do terms <- char '[' *> blanks *> sepBy bareTerm (char ',' <* blanks)

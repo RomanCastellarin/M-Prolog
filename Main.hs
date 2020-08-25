@@ -1,19 +1,27 @@
+module Main (main) where
 
-module Main where
+{-
+    ============================================
+                M-Prolog command line    
+    ============================================
+-}
 
+-- MODULES                              imports
 import Source.AST
-import Source.Parser
-import Text.ParserCombinators.Parsec    (parse)
-import Source.Interpreter
---import Source.Sandbox
+import Source.Parser                    (predicate, rule, program, renameRules)
+import Source.Interpreter               
+import Source.Printer                   (showResults, showRule)
 
+-- BASE LIBRARIES                       imports
 import Data.List                        (intercalate)
-import System.Directory                 (doesFileExist)
+
 import Control.Monad                    (when)
 import Data.Maybe                       (fromMaybe)
 import Text.Read                        (readMaybe)
 
-
+-- 3rd PARTY LIBRARIES                  imports
+import Text.ParserCombinators.Parsec    (parse)
+import System.Directory                 (doesFileExist)
 
 main :: IO ()
 main = prompt Nothing
@@ -63,25 +71,11 @@ loadProgram action = do putStr "Enter filename: "
                         if not exists
                         then putStrLn ("Error: " ++ filename ++ " does not exist.") >> action
                         else do source <- readFile filename
-                                case parse rules filename source of
+                                case parse program filename source of
                                  Left  err     -> putStrLn ("Error: " ++ show err) >> action
                                  Right program -> prompt $ Just program
                                      
 
-showProof :: Int -> Proof -> String
-showProof i p = case p of
-        Proof n s xs | n == 0        -> "\n" ++ concat (showProof (i+1) <$> xs) -- FOR USER QUERY
-                     | n == -1       -> space i ++ "Rule: " ++ s ++ "\n" ++ concat (showProof (i+1) <$> xs) -- WHEN is it because of goal ?
-                     | n == aritRule -> space i ++ "(arithmetic) " ++ s ++ "\n"
-                     | otherwise     -> space i ++ "Rule " ++ show n ++ ": " ++ s ++ "\n" ++ concat (showProof (i+1) <$> xs)
-    where space n = [1..n] >>= const "  "
 
-showResults :: [Solution] -> [String]
-showResults sols = if null sols then ["No"] else showSolution <$> sols
-    where showSolution (σ, p) = "Solution:\n\t" ++ showUnifier σ ++ "\nProof:\n" ++ showProof 1 p
-          showUnifier σ = if null σ then "Yes" else intercalate " " $ showAssignment <$> filter (\(Variable i _, _) -> i == 0) σ
-          showAssignment (Variable _ v, t) = v ++ " = " ++ showTerm t 
 
-showRule :: Rule -> String
-showRule r = case r of
-    Rule i p clauses -> show i ++ ") " ++ showPredicate p ++ (if null clauses then "" else " :- ") ++  intercalate ", " (showPredicate <$> clauses) ++ "."
+
