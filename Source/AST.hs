@@ -53,7 +53,7 @@ type RuleID = Int
 -- ¿Cómputo directo del predicado o de su opuesto?
 type Direct = Bool
 
--- Expresiones Aritméticas
+-- Expresiones Aritméticas con enteros y variables del tipo a de Haskell
 data IntExp a = IntConst   Integer
               | IntPlus    (IntExp a) (IntExp a)
               | IntMinus   (IntExp a) (IntExp a)
@@ -62,7 +62,7 @@ data IntExp a = IntConst   Integer
               | IntVar     a
     deriving (Show, Functor, Eq)
 
--- Expresiones Aritméticas sobre Variables
+-- Expresiones Aritméticas sobre Variables de lenguaje
 type ArithExp = IntExp Variable
 
 -- Substitución: unificador más general 

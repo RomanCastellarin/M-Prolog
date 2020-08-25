@@ -23,9 +23,12 @@ import Text.Read                        (readMaybe)
 import Text.ParserCombinators.Parsec    (parse)
 import System.Directory                 (doesFileExist)
 
+
+-- main
 main :: IO ()
 main = prompt Nothing
 
+-- interfaz de usuario
 prompt :: Maybe Program  -> IO()
 prompt program = putStr "?- " >> getLine >>= processCommand
     where processCommand cmd = case cmd of
@@ -36,6 +39,7 @@ prompt program = putStr "?- " >> getLine >>= processCommand
             "remove!"  -> removeRule program (prompt program)
             query      -> executeQuery program query >> prompt program
 
+-- pide ingresar una regla por IO y la adiciona al programa 
 addRule :: Maybe Program -> IO() -> IO()
 addRule program action = do putStr "Enter rule: "
                             input <- getLine
@@ -44,6 +48,7 @@ addRule program action = do putStr "Enter rule: "
                                 Left err -> putStrLn ("Error: " ++ show err) >> action
                                 Right r  -> prompt . return . renameRules $ (r:prog)
 
+-- pide indicar una regla por IO y la elimina del programa 
 removeRule :: Maybe Program -> IO() -> IO()
 removeRule program action = do putStr "Enter rule number: "
                                input <- getLine
@@ -54,7 +59,7 @@ removeRule program action = do putStr "Enter rule number: "
     where check prog n = if 1 <= n && n <= length prog then return n else Nothing
           delete prog n = let (l,r) = splitAt (n-1) prog in l ++ tail r 
                             
-
+-- toma un predicado y muestra su resolucion por pantalla
 executeQuery :: Maybe Program -> String -> IO()
 executeQuery program query = case result of
         Left  err  -> putStrLn ("Error: " ++ show err)
@@ -64,6 +69,7 @@ executeQuery program query = case result of
             []      -> return ()
             (s:ss)  -> putStr s >> getLine >>= \ i -> when (i == ";") $ less ss
 
+-- pide ingresar un nombre de archivo y carga su contenido en memoria
 loadProgram :: IO() -> IO()
 loadProgram action = do putStr "Enter filename: "
                         filename <- getLine
@@ -75,7 +81,3 @@ loadProgram action = do putStr "Enter filename: "
                                  Left  err     -> putStrLn ("Error: " ++ show err) >> action
                                  Right program -> prompt $ Just program
                                      
-
-
-
-
